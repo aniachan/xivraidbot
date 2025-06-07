@@ -15,7 +15,7 @@ public class ReminderService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly DiscordSocketClient _client;
-    private readonly Timer? _reminderTimer;
+    private Timer? _reminderTimer;
     
     public ReminderService(IServiceProvider serviceProvider, DiscordSocketClient client)
     {
@@ -98,9 +98,9 @@ public class ReminderService
             var message = await channel.SendMessageAsync(mentions, embed: embed);
             
             // Add reaction options
-            await message.AddReactionAsync(new Emoji("?")); // Confirm
-            await message.AddReactionAsync(new Emoji("?")); // Decline
-            await message.AddReactionAsync(new Emoji("??")); // Bench
+            await message.AddReactionAsync(new Emoji("\u2705")); // Confirm
+            await message.AddReactionAsync(new Emoji("\u274C")); // Decline
+            await message.AddReactionAsync(new Emoji("\uD83E\uDE91")); // Bench
             
             // Save the reminder message ID
             raid.ReminderMessageId = message.Id;
@@ -117,9 +117,9 @@ public class ReminderService
                 
                 AttendanceStatus status = emoji switch
                 {
-                    "?" => AttendanceStatus.Confirmed,
-                    "?" => AttendanceStatus.Declined,
-                    "??" => AttendanceStatus.BenchRequested,
+                    "\u2705" => AttendanceStatus.Confirmed,
+                    "\u274C" => AttendanceStatus.Declined,
+                    "\uD83E\uDE91" => AttendanceStatus.BenchRequested,
                     _ => AttendanceStatus.Pending
                 };
                 
