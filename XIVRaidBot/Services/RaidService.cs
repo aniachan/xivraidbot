@@ -58,7 +58,7 @@ public class RaidService
     public async Task<List<Raid>> GetUpcomingRaidsAsync(ulong guildId)
     {
         return await _context.Raids
-            .Where(r => r.GuildId == guildId && r.ScheduledTime > DateTime.Now && !r.IsArchived)
+            .Where(r => r.GuildId == guildId && r.ScheduledTime > DateTime.UtcNow && !r.IsArchived)
             .OrderBy(r => r.ScheduledTime)
             .ToListAsync();
     }

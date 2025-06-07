@@ -103,13 +103,13 @@ public class RaidCompositionService
                 UserId = character.UserId,
                 UserName = character.CharacterName,
                 Status = AttendanceStatus.Confirmed,
-                ResponseTime = DateTime.Now
+                ResponseTime = DateTime.UtcNow
             });
         }
         else if (attendance.Status != AttendanceStatus.Confirmed)
         {
             attendance.Status = AttendanceStatus.Confirmed;
-            attendance.ResponseTime = DateTime.Now;
+            attendance.ResponseTime = DateTime.UtcNow;
         }
         
         await _context.SaveChangesAsync();

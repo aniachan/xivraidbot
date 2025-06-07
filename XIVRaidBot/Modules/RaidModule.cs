@@ -35,7 +35,7 @@ public class RaidModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
         
-        if (scheduledTime <= DateTime.Now)
+        if (scheduledTime <= DateTime.UtcNow)
         {
             await FollowupAsync("Raid time must be in the future.", ephemeral: true);
             return;

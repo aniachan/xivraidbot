@@ -4,6 +4,7 @@ using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -17,7 +18,9 @@ public class DiscordBotService
     private readonly InteractionService _interactionService;
     private readonly CommandService _commandService;
     private readonly IConfiguration _configuration;
-    
+
+    private readonly ILogger<DiscordBotService> _logger;
+
     public DiscordBotService(
         IServiceProvider serviceProvider,
         DiscordSocketClient client,
@@ -30,8 +33,10 @@ public class DiscordBotService
         _interactionService = interactionService;
         _commandService = commandService;
         _configuration = configuration;
+
+        _logger = serviceProvider.GetRequiredService<ILogger<DiscordBotService>>();
     }
-    
+
     public async Task StartAsync()
     {
         // Configure event handlers
@@ -71,19 +76,26 @@ public class DiscordBotService
         await _client.LoginAsync(TokenType.Bot, token);
         await _client.StartAsync();
         
-        Console.WriteLine("Bot is starting...");
+        _logger.LogInformation("Bot is starting...");
     }
     
     private Task LogAsync(LogMessage log)
     {
-        Console.WriteLine(log.ToString());
+        if (log.Exception != null)
+        {
+            _logger.LogError(log.Exception, "Discord log error: {Message}", log.Message);
+        }
+        else
+        {
+            _logger.LogInformation("Discord log: {Message}", log.Message);
+        }
         return Task.CompletedTask;
     }
     
     private async Task ReadyAsync()
     {
-        Console.WriteLine($"Bot is connected as {_client.CurrentUser.Username}");
-        
+        _logger.LogInformation($"Bot is ready and connected as {_client.CurrentUser.Username}");
+
         // Register slash commands
         try
         {
@@ -93,21 +105,21 @@ public class DiscordBotService
             if (ulong.TryParse(guildId, out var id))
             {
                 await _interactionService.RegisterCommandsToGuildAsync(id);
-                Console.WriteLine($"Registered commands to guild {id}");
+                _logger.LogInformation($"Registered commands to guild {id}");
             }
             else
             {
                 await _interactionService.RegisterCommandsGloballyAsync();
-                Console.WriteLine("Registered commands globally");
+                _logger.LogInformation("Registered commands globally");
             }
             #else
             await _interactionService.RegisterCommandsGloballyAsync();
-            Console.WriteLine("Registered commands globally");
+            _logger.LogInformation("Registered commands globally");
             #endif
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error registering commands: {ex.Message}");
+            _logger.LogError($"Error registering commands: {ex.Message}");
         }
         
         // Start background services

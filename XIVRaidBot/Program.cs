@@ -5,10 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using System.IO;
+using Microsoft.Extensions.Logging;
 using XIVRaidBot.Data;
 using XIVRaidBot.Services;
 
@@ -41,6 +38,12 @@ public class Program
                     config.AddCommandLine(args);
                 }
             })
+            .ConfigureLogging((hostContext, logging) =>
+            {
+                logging.ClearProviders();
+                logging.AddConfiguration(hostContext.Configuration.GetSection("Logging"));
+                logging.AddConsole();
+            })
             .ConfigureServices((context, services) =>
             {
                 // Configure discord client options from configuration
@@ -61,6 +64,9 @@ public class Program
                 services.AddDbContextPool<RaidBotContext>(opt =>
                     opt.UseNpgsql(context.Configuration.GetConnectionString("DefaultConnection")));
 
+                // Logging service
+                services.AddSingleton<LoggingService>();
+                
                 // Bot services
                 services.AddSingleton<DiscordBotService>();
                 services.AddScoped<RaidService>();
@@ -77,20 +83,21 @@ public class Program
     {
         using IServiceScope scope = host.Services.CreateScope();
         var services = scope.ServiceProvider;
+        var logger = services.GetRequiredService<ILogger<Program>>();
         
         try
         {
             // Debug DI container to see registered services
-            Console.WriteLine("Listing available services in DI container:");
-            ListRegisteredServices(host.Services);
+            logger.LogInformation("Listing available services in DI container:");
+            ListRegisteredServices(host.Services, logger);
             
             // Get the database context
             var dbContext = services.GetRequiredService<RaidBotContext>();
             
             // Apply any pending migrations
-            Console.WriteLine("Applying database migrations...");
+            logger.LogInformation("Applying database migrations...");
             await dbContext.Database.MigrateAsync();
-            Console.WriteLine("Database migrations applied successfully.");
+            logger.LogInformation("Database migrations applied successfully.");
             
             // Start bot service
             try
@@ -100,10 +107,8 @@ public class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to start bot service: {ex.Message}");
-                Console.WriteLine($"Inner exception: {ex.InnerException?.Message}");
-                Console.WriteLine(ex.StackTrace);
-                ValidateRequiredDependencies(services);
+                logger.LogError(ex, "Failed to start bot service");
+                ValidateRequiredDependencies(services, logger);
                 throw; // Rethrow to terminate application
             }
             
@@ -112,12 +117,11 @@ public class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error occurred: {ex.Message}");
-            Console.WriteLine(ex.StackTrace);
+            logger.LogCritical(ex, "Error occurred during application startup");
         }
     }
     
-    private static void ListRegisteredServices(IServiceProvider serviceProvider)
+    private static void ListRegisteredServices(IServiceProvider serviceProvider, ILogger<Program> logger)
     {
         Type serviceProviderType = serviceProvider.GetType();
         var callSiteFactory = serviceProviderType.GetProperty("CallSiteFactory", 
@@ -132,40 +136,43 @@ public class Program
             {
                 foreach (var service in services)
                 {
-                    Console.WriteLine($"Service: {service.ServiceType.FullName}, Lifetime: {service.Lifetime}, Implementation: {service.ImplementationType?.FullName ?? service.ImplementationFactory?.ToString() ?? service.ImplementationInstance?.ToString() ?? "Unknown"}");
+                    logger.LogDebug("Service: {ServiceType}, Lifetime: {Lifetime}, Implementation: {Implementation}",
+                        service.ServiceType.FullName,
+                        service.Lifetime,
+                        service.ImplementationType?.FullName ?? service.ImplementationFactory?.ToString() ?? service.ImplementationInstance?.ToString() ?? "Unknown");
                 }
             }
         }
         else
         {
-            Console.WriteLine("Unable to retrieve registered services from this service provider implementation.");
+            logger.LogWarning("Unable to retrieve registered services from this service provider implementation.");
         }
     }
     
-    private static void ValidateRequiredDependencies(IServiceProvider services)
+    private static void ValidateRequiredDependencies(IServiceProvider services, ILogger<Program> logger)
     {
-        Console.WriteLine("Validating required dependencies...");
+        logger.LogInformation("Validating required dependencies...");
         
-        ValidateDependency<DiscordSocketClient>(services, "DiscordSocketClient");
-        ValidateDependency<InteractionService>(services, "InteractionService");
-        ValidateDependency<CommandService>(services, "CommandService");
-        ValidateDependency<DiscordSocketConfig>(services, "DiscordSocketConfig");
-        ValidateDependency<RaidBotContext>(services, "RaidBotContext");
-        ValidateDependency<IConfiguration>(services, "IConfiguration");
+        ValidateDependency<DiscordSocketClient>(services, "DiscordSocketClient", logger);
+        ValidateDependency<InteractionService>(services, "InteractionService", logger);
+        ValidateDependency<CommandService>(services, "CommandService", logger);
+        ValidateDependency<DiscordSocketConfig>(services, "DiscordSocketConfig", logger);
+        ValidateDependency<RaidBotContext>(services, "RaidBotContext", logger);
+        ValidateDependency<IConfiguration>(services, "IConfiguration", logger);
         
-        Console.WriteLine("Required dependency validation completed.");
+        logger.LogInformation("Required dependency validation completed.");
     }
     
-    private static void ValidateDependency<T>(IServiceProvider services, string dependencyName)
+    private static void ValidateDependency<T>(IServiceProvider services, string dependencyName, ILogger<Program> logger)
     {
         try
         {
             var service = services.GetRequiredService<T>();
-            Console.WriteLine($"✅ {dependencyName} successfully resolved");
+            logger.LogInformation("✅ {DependencyName} successfully resolved", dependencyName);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ {dependencyName} failed to resolve: {ex.Message}");
+            logger.LogError(ex, "❌ {DependencyName} failed to resolve", dependencyName);
         }
     }
 }

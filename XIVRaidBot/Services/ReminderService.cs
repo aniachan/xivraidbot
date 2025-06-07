@@ -2,10 +2,7 @@ using Discord;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using XIVRaidBot.Data;
 using XIVRaidBot.Models;
 
@@ -16,11 +13,14 @@ public class ReminderService
     private readonly IServiceProvider _serviceProvider;
     private readonly DiscordSocketClient _client;
     private Timer? _reminderTimer;
-    
+
+    private readonly ILogger<ReminderService> _logger;
+
     public ReminderService(IServiceProvider serviceProvider, DiscordSocketClient client)
     {
         _serviceProvider = serviceProvider;
         _client = client;
+        _logger = serviceProvider.GetRequiredService<ILogger<ReminderService>>();
     }
     
     public Task StartAsync()
@@ -36,7 +36,7 @@ public class ReminderService
         {
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<RaidBotContext>();
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             
             // Get raids that are scheduled within the next 24-25 hours and don't already have a reminder sent
             var raids = await context.Raids
@@ -65,7 +65,7 @@ public class ReminderService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error checking reminders: {ex.Message}");
+            _logger.LogError($"Error checking reminders: {ex.Message}");
         }
     }
     
@@ -137,7 +137,7 @@ public class ReminderService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error sending raid reminder: {ex.Message}");
+            _logger.LogError($"Error sending raid reminder for raid {raid.Id}: {ex.Message}");
         }
     }
     
@@ -160,7 +160,7 @@ public class ReminderService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error sending last reminder: {ex.Message}");
+            _logger.LogError($"Error sending last reminder for raid {raid.Id}: {ex.Message}");
         }
     }
 }

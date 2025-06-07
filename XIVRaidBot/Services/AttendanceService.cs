@@ -1,8 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using XIVRaidBot.Data;
 using XIVRaidBot.Models;
 
@@ -32,7 +28,7 @@ public class AttendanceService
                 UserId = userId,
                 UserName = userName,
                 Status = status,
-                ResponseTime = DateTime.Now,
+                ResponseTime = DateTime.UtcNow,
                 Note = note
             };
             
@@ -41,7 +37,7 @@ public class AttendanceService
         else
         {
             attendance.Status = status;
-            attendance.ResponseTime = DateTime.Now;
+            attendance.ResponseTime = DateTime.UtcNow;
             attendance.Note = note ?? attendance.Note;
         }
         

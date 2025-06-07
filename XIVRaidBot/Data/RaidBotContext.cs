@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Text.Json;
 using XIVRaidBot.Models;
 
 namespace XIVRaidBot.Data;
@@ -42,13 +44,19 @@ public class RaidBotContext : DbContext
         modelBuilder.Entity<RaidComposition>()
             .HasIndex(rc => new { rc.RaidId, rc.CharacterId })
             .IsUnique();
-            
+
         // Convert JobType list to string
         modelBuilder.Entity<Character>()
             .Property(c => c.SecondaryJobs)
             .HasConversion(
-                v => string.Join(',', v),
-                v => v.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(j => Enum.Parse<JobType>(j)).ToList()
-            );
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<List<JobType>>(v, (JsonSerializerOptions?)null) ?? new List<JobType>())
+            .Metadata
+            .SetValueComparer(new ValueComparer<List<JobType>>(
+                (c1, c2) => c1 != null && c2 != null && c1.SequenceEqual(c2),
+                c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => c == null ? new List<JobType>() : new List<JobType>(c)
+            ));
+
     }
 }
