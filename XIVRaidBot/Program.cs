@@ -5,6 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
 using XIVRaidBot.Data;
 using XIVRaidBot.Services;
 
@@ -39,15 +43,18 @@ public class Program
             })
             .ConfigureServices((context, services) =>
             {
-                // Configure discord client options
-                var config = new DiscordSocketConfig()
+                // Configure discord client options from configuration
+                var discordConfig = new DiscordSocketConfig
                 {
-                    //...
+                    GatewayIntents = Discord.GatewayIntents.AllUnprivileged | Discord.GatewayIntents.MessageContent | Discord.GatewayIntents.GuildMembers,
+                    AlwaysDownloadUsers = true,
+                    MessageCacheSize = 100
                 };
 
                 // Discord.NET configurations
-                services.AddSingleton<DiscordSocketClient>();
-                services.AddSingleton<InteractionService>();
+                services.AddSingleton(discordConfig);
+                services.AddSingleton<DiscordSocketClient>(sp => new DiscordSocketClient(sp.GetRequiredService<DiscordSocketConfig>()));
+                services.AddSingleton<InteractionService>(sp => new InteractionService(sp.GetRequiredService<DiscordSocketClient>()));
                 services.AddSingleton<CommandService>();
                 
                 // Database context
@@ -73,6 +80,10 @@ public class Program
         
         try
         {
+            // Debug DI container to see registered services
+            Console.WriteLine("Listing available services in DI container:");
+            ListRegisteredServices(host.Services);
+            
             // Get the database context
             var dbContext = services.GetRequiredService<RaidBotContext>();
             
@@ -82,8 +93,19 @@ public class Program
             Console.WriteLine("Database migrations applied successfully.");
             
             // Start bot service
-            var botService = services.GetRequiredService<DiscordBotService>();
-            await botService.StartAsync();
+            try
+            {
+                var botService = services.GetRequiredService<DiscordBotService>();
+                await botService.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to start bot service: {ex.Message}");
+                Console.WriteLine($"Inner exception: {ex.InnerException?.Message}");
+                Console.WriteLine(ex.StackTrace);
+                ValidateRequiredDependencies(services);
+                throw; // Rethrow to terminate application
+            }
             
             // Keep the program running
             await Task.Delay(Timeout.Infinite);
@@ -92,6 +114,58 @@ public class Program
         {
             Console.WriteLine($"Error occurred: {ex.Message}");
             Console.WriteLine(ex.StackTrace);
+        }
+    }
+    
+    private static void ListRegisteredServices(IServiceProvider serviceProvider)
+    {
+        Type serviceProviderType = serviceProvider.GetType();
+        var callSiteFactory = serviceProviderType.GetProperty("CallSiteFactory", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(serviceProvider);
+        
+        if (callSiteFactory != null)
+        {
+            var descriptors = callSiteFactory.GetType().GetField("_descriptors", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(callSiteFactory);
+            
+            if (descriptors is System.Collections.Generic.IEnumerable<Microsoft.Extensions.DependencyInjection.ServiceDescriptor> services)
+            {
+                foreach (var service in services)
+                {
+                    Console.WriteLine($"Service: {service.ServiceType.FullName}, Lifetime: {service.Lifetime}, Implementation: {service.ImplementationType?.FullName ?? service.ImplementationFactory?.ToString() ?? service.ImplementationInstance?.ToString() ?? "Unknown"}");
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine("Unable to retrieve registered services from this service provider implementation.");
+        }
+    }
+    
+    private static void ValidateRequiredDependencies(IServiceProvider services)
+    {
+        Console.WriteLine("Validating required dependencies...");
+        
+        ValidateDependency<DiscordSocketClient>(services, "DiscordSocketClient");
+        ValidateDependency<InteractionService>(services, "InteractionService");
+        ValidateDependency<CommandService>(services, "CommandService");
+        ValidateDependency<DiscordSocketConfig>(services, "DiscordSocketConfig");
+        ValidateDependency<RaidBotContext>(services, "RaidBotContext");
+        ValidateDependency<IConfiguration>(services, "IConfiguration");
+        
+        Console.WriteLine("Required dependency validation completed.");
+    }
+    
+    private static void ValidateDependency<T>(IServiceProvider services, string dependencyName)
+    {
+        try
+        {
+            var service = services.GetRequiredService<T>();
+            Console.WriteLine($"✅ {dependencyName} successfully resolved");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ {dependencyName} failed to resolve: {ex.Message}");
         }
     }
 }
