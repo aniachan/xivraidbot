@@ -2,9 +2,10 @@
 
 ## Features
 - Implement the job icons (reference githubusercontent endpoints for icon urls
-
-## Cleanliness
-- Replace console logging with a proper logging library
+- Need to convert timezone to UTC when receiving timestamps from users. 
+	 Might also need to store the timezone of the user somewhere for easy 
+     conversion. Also make sure to use the discord local time formatting 
+     thing for printing it back for everyone to see.
 
 ## Deployment and CI/CD
 - Implement configuration reading from environment variables (for use in kubernetes)

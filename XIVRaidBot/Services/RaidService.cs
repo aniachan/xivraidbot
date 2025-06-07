@@ -40,12 +40,13 @@ public class RaidService
             IsArchived = false
         };
         
+        raid.ScheduledTime = scheduledTime.ToUniversalTime(); // Ensure time is in UTC
         _context.Raids.Add(raid);
         await _context.SaveChangesAsync();
         
         return raid;
     }
-    
+
     public async Task<Raid?> GetRaidAsync(int raidId)
     {
         return await _context.Raids
