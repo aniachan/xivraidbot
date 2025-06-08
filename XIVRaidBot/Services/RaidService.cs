@@ -14,11 +14,16 @@ public class RaidService
 {
     private readonly RaidBotContext _context;
     private readonly DiscordSocketClient _client;
+    private readonly JobIconService _jobIconService;
     
-    public RaidService(RaidBotContext context, DiscordSocketClient client)
+    public RaidService(RaidBotContext context, DiscordSocketClient client, JobIconService jobIconService, RaidCompositionService compositionService)
     {
         _context = context;
         _client = client;
+        _jobIconService = jobIconService;
+        
+        // Subscribe to the RaidCompositionChanged event
+        compositionService.RaidCompositionChanged += UpdateRaidMessageAsync;
     }
     
     public async Task<Raid> CreateRaidAsync(
@@ -159,23 +164,51 @@ public class RaidService
         var declined = raid.Attendees.Count(a => a.Status == AttendanceStatus.Declined);
         var bench = raid.Attendees.Count(a => a.Status == AttendanceStatus.BenchRequested || a.Status == AttendanceStatus.OnBench);
         
-        embed.AddField("Attendance", $"? Confirmed: {confirmed}\n? Pending: {pending}\n? Declined: {declined}\n?? Bench: {bench}");
+        embed.AddField("Attendance", $"?? Confirmed: {confirmed}\n? Pending: {pending}\n?? Declined: {declined}\n?? Bench: {bench}");
         
-        // Add raid composition
+        // Add raid composition with job icons
         if (raid.Compositions.Any())
         {
-            var tanks = raid.Compositions.Where(c => GetRoleFromJobType(c.AssignedJob) == JobRole.Tank)
-                .Select(c => $"{c.AssignedJob} - {c.Character.CharacterName}");
-                
-            var healers = raid.Compositions.Where(c => GetRoleFromJobType(c.AssignedJob) == JobRole.Healer)
-                .Select(c => $"{c.AssignedJob} - {c.Character.CharacterName}");
-                
-            var dps = raid.Compositions.Where(c => GetRoleFromJobType(c.AssignedJob) == JobRole.DPS)
-                .Select(c => $"{c.AssignedJob} - {c.Character.CharacterName}");
-                
-            embed.AddField("Tanks", tanks.Any() ? string.Join("\n", tanks) : "None assigned", true);
-            embed.AddField("Healers", healers.Any() ? string.Join("\n", healers) : "None assigned", true);
-            embed.AddField("DPS", dps.Any() ? string.Join("\n", dps) : "None assigned", true);
+            // Group by role for organized display
+            var tanks = raid.Compositions.Where(c => GetRoleFromJobType(c.AssignedJob) == JobRole.Tank);
+            var healers = raid.Compositions.Where(c => GetRoleFromJobType(c.AssignedJob) == JobRole.Healer);
+            var dps = raid.Compositions.Where(c => GetRoleFromJobType(c.AssignedJob) == JobRole.DPS);
+            
+            // Format tanks with icons
+            if (tanks.Any())
+            {
+                var tankStr = string.Join("\n", tanks.Select(c => 
+                    $"[{c.AssignedJob}]({_jobIconService.GetJobIconUrl(c.AssignedJob)}) - {c.Character.CharacterName}"));
+                embed.AddField("Tanks", tankStr, true);
+            }
+            else
+            {
+                embed.AddField("Tanks", "None assigned", true);
+            }
+            
+            // Format healers with icons
+            if (healers.Any())
+            {
+                var healerStr = string.Join("\n", healers.Select(c => 
+                    $"[{c.AssignedJob}]({_jobIconService.GetJobIconUrl(c.AssignedJob)}) - {c.Character.CharacterName}"));
+                embed.AddField("Healers", healerStr, true);
+            }
+            else
+            {
+                embed.AddField("Healers", "None assigned", true);
+            }
+            
+            // Format DPS with icons
+            if (dps.Any())
+            {
+                var dpsStr = string.Join("\n", dps.Select(c => 
+                    $"[{c.AssignedJob}]({_jobIconService.GetJobIconUrl(c.AssignedJob)}) - {c.Character.CharacterName}"));
+                embed.AddField("DPS", dpsStr, true);
+            }
+            else
+            {
+                embed.AddField("DPS", "None assigned", true);
+            }
         }
         
         embed.WithFooter($"Raid ID: {raid.Id}");

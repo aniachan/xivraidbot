@@ -11,12 +11,15 @@ namespace XIVRaidBot.Services;
 public class RaidCompositionService
 {
     private readonly RaidBotContext _context;
-    private readonly RaidService _raidService;
+    private readonly JobIconService _jobIconService;
     
-    public RaidCompositionService(RaidBotContext context, RaidService raidService)
+    // Event to notify that a raid composition has been updated
+    public event Func<int, Task>? RaidCompositionChanged;
+    
+    public RaidCompositionService(RaidBotContext context, JobIconService jobIconService)
     {
         _context = context;
-        _raidService = raidService;
+        _jobIconService = jobIconService;
     }
     
     public async Task<Character> RegisterCharacterAsync(ulong userId, string characterName, string world, JobType preferredJob, List<JobType>? secondaryJobs = null)
@@ -113,7 +116,12 @@ public class RaidCompositionService
         }
         
         await _context.SaveChangesAsync();
-        await _raidService.UpdateRaidMessageAsync(raidId);
+        
+        // Notify subscribers that raid composition has changed
+        if (RaidCompositionChanged != null)
+        {
+            await RaidCompositionChanged.Invoke(raidId);
+        }
         
         return composition;
     }
@@ -127,7 +135,12 @@ public class RaidCompositionService
         
         _context.RaidCompositions.Remove(composition);
         await _context.SaveChangesAsync();
-        await _raidService.UpdateRaidMessageAsync(raidId);
+        
+        // Notify subscribers that raid composition has changed
+        if (RaidCompositionChanged != null)
+        {
+            await RaidCompositionChanged.Invoke(raidId);
+        }
         
         return true;
     }
@@ -162,6 +175,16 @@ public class RaidCompositionService
         return counts[JobRole.Tank] == 2 &&
                counts[JobRole.Healer] == 2 &&
                counts[JobRole.DPS] == 4;
+    }
+    
+    public string GetJobIconMarkdown(JobType jobType)
+    {
+        return $"[{jobType}]({_jobIconService.GetJobIconUrl(jobType)})";
+    }
+    
+    public string GetJobEmoji(JobType jobType)
+    {
+        return _jobIconService.GetJobEmoji(jobType);
     }
     
     private JobRole GetRoleFromJobType(JobType jobType)

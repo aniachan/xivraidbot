@@ -67,12 +67,13 @@ public class Program
                 // Logging service
                 services.AddSingleton<LoggingService>();
                 
-                // Bot services
+                // Bot services - order matters for dependencies
                 services.AddSingleton<DiscordBotService>();
-                services.AddScoped<RaidService>();
-                services.AddScoped<ReminderService>();
+                services.AddSingleton<JobIconService>(); // Add our new JobIconService as a singleton
                 services.AddScoped<AttendanceService>();
-                services.AddScoped<RaidCompositionService>();
+                services.AddScoped<RaidCompositionService>(); // Register before RaidService
+                services.AddScoped<RaidService>(); // Depends on RaidCompositionService
+                services.AddScoped<ReminderService>();
             })
             .Build();
 
@@ -159,6 +160,9 @@ public class Program
         ValidateDependency<DiscordSocketConfig>(services, "DiscordSocketConfig", logger);
         ValidateDependency<RaidBotContext>(services, "RaidBotContext", logger);
         ValidateDependency<IConfiguration>(services, "IConfiguration", logger);
+        ValidateDependency<JobIconService>(services, "JobIconService", logger);
+        ValidateDependency<RaidCompositionService>(services, "RaidCompositionService", logger);
+        ValidateDependency<RaidService>(services, "RaidService", logger);
         
         logger.LogInformation("Required dependency validation completed.");
     }

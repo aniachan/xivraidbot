@@ -1,7 +1,6 @@
 # To Do
 
 ## Features
-- Implement the job icons (reference githubusercontent endpoints for icon urls
 - Need to convert timezone to UTC when receiving timestamps from users. 
 	 Might also need to store the timezone of the user somewhere for easy 
      conversion. Also make sure to use the discord local time formatting 
