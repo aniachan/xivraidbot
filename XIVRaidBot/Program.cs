@@ -68,12 +68,12 @@ public class Program
                 services.AddSingleton<LoggingService>();
                 
                 // Bot services - order matters for dependencies
-                services.AddSingleton<DiscordBotService>();
-                services.AddSingleton<JobIconService>(); // Add our new JobIconService as a singleton
+                services.AddSingleton<DiscordBotService>();                services.AddSingleton<JobIconService>(); // Add our new JobIconService as a singleton
                 services.AddScoped<AttendanceService>();
                 services.AddScoped<RaidCompositionService>(); // Register before RaidService
                 services.AddScoped<RaidService>(); // Depends on RaidCompositionService
                 services.AddScoped<ReminderService>();
+                services.AddScoped<UserSettingsService>(); // Add UserSettingsService for timezone handling
             })
             .Build();
 

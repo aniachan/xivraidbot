@@ -12,14 +12,18 @@ public class RaidModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly RaidService _raidService;
     private readonly AttendanceService _attendanceService;
+    private readonly UserSettingsService _userSettingsService;
     
-    public RaidModule(RaidService raidService, AttendanceService attendanceService)
+    public RaidModule(
+        RaidService raidService, 
+        AttendanceService attendanceService,
+        UserSettingsService userSettingsService)
     {
         _raidService = raidService;
         _attendanceService = attendanceService;
+        _userSettingsService = userSettingsService;
     }
-    
-    [SlashCommand("create", "Create a new raid event")]
+      [SlashCommand("create", "Create a new raid event")]
     public async Task CreateRaidAsync(
         [Summary("name", "The name of the raid")] string name,
         [Summary("description", "A description of the raid")] string description,
@@ -29,11 +33,29 @@ public class RaidModule : InteractionModuleBase<SocketInteractionContext>
     {
         await DeferAsync();
         
+        // Check if user has set their timezone
+        if (!await _userSettingsService.HasUserSetTimezoneAsync(Context.User.Id))
+        {
+            var embed = new EmbedBuilder()
+                .WithTitle("Timezone Required")
+                .WithDescription("You need to set your timezone before creating a raid. This ensures raid times are correctly converted to UTC for all members.")
+                .WithColor(Color.Orange)
+                .AddField("How to Set Your Timezone", "Use the `/settings timezone` command followed by your timezone ID.\nFor example: `/settings timezone Europe/Stockholm`")
+                .AddField("List Available Timezones", "Use the `/settings timezone-list` command to see all available timezone options.")
+                .Build();
+                
+            await FollowupAsync(embed: embed, ephemeral: true);
+            return;
+        }
+        
         if (!DateTime.TryParse($"{date} {time}", out var scheduledTime))
         {
             await FollowupAsync("Invalid date or time format. Please use yyyy-MM-dd for date and HH:mm for time.", ephemeral: true);
             return;
         }
+        
+        // Convert the time from the user's timezone to UTC
+        scheduledTime = await _userSettingsService.ConvertToUtcAsync(Context.User.Id, scheduledTime);
         
         if (scheduledTime <= DateTime.UtcNow)
         {

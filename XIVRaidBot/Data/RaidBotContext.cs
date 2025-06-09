@@ -15,6 +15,7 @@ public class RaidBotContext : DbContext
     public DbSet<RaidAttendance> RaidAttendances { get; set; } = null!;
     public DbSet<Character> Characters { get; set; } = null!;
     public DbSet<RaidComposition> RaidCompositions { get; set; } = null!;
+    public DbSet<UserSettings> UserSettings { get; set; } = null!;
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +44,11 @@ public class RaidBotContext : DbContext
         // Configure RaidComposition entity
         modelBuilder.Entity<RaidComposition>()
             .HasIndex(rc => new { rc.RaidId, rc.CharacterId })
+            .IsUnique();
+            
+        // Configure UserSettings entity
+        modelBuilder.Entity<UserSettings>()
+            .HasIndex(us => us.UserId)
             .IsUnique();
 
         // Convert JobType list to string
