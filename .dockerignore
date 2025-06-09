@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.github
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# IDE files
+.vs
+.vscode
+*.user
+*.suo
+*.userprefs
+
+# Build results
+**/[Bb]in/
+**/[Oo]bj/
+**/[Ll]og/
+**/[Ll]ogs/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# User-specific files
+XIVRaidBot/appsettings.local.json
+
+# Others
+README.md
+LICENSE
+*.md
+!TODO.md
